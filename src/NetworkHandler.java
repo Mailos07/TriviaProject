@@ -1,7 +1,4 @@
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
+import java.io.*;
 import java.net.*;
 import java.util.function.Consumer;
 
@@ -25,13 +22,10 @@ public class NetworkHandler {
     }
 
     public void connect() throws IOException {
-        // Establish TCP connection
         tcpSocket = new Socket(serverAddress, tcpPort);
         tcpOut = new PrintWriter(tcpSocket.getOutputStream(), true);
         tcpIn = new BufferedReader(new InputStreamReader(tcpSocket.getInputStream()));
-
         udpSocket = new DatagramSocket();
-
         new Thread(this::listenForMessages).start();
     }
 
@@ -39,7 +33,7 @@ public class NetworkHandler {
         try {
             String message;
             while (running && (message = tcpIn.readLine()) != null) {
-                if (message.startsWith("WELCOME|")) {
+                if (message.startsWith(GameProtocol.WELCOME)) {
                     clientId = Integer.parseInt(message.split("\\|")[1]);
                 }
                 messageHandler.accept(message);
@@ -55,7 +49,15 @@ public class NetworkHandler {
         tcpOut.println(message);
     }
 
-    public void sendUdpMessage(String message) {
+    public void sendUdpBuzz(int questionNumber) {
+        sendUdpMessage(GameProtocol.BUZZ + "|" + clientId + "|" + questionNumber);
+    }
+
+    public void sendAnswer(int questionNumber, int answer) {
+        sendTcpMessage("ANSWER|" + questionNumber + "|" + answer);
+    }
+
+    private void sendUdpMessage(String message) {
         try {
             byte[] buffer = message.getBytes();
             InetAddress address = InetAddress.getByName(serverAddress);
@@ -69,7 +71,7 @@ public class NetworkHandler {
     public void disconnect() {
         running = false;
         try {
-            sendTcpMessage("DISCONNECT");
+            sendTcpMessage(GameProtocol.DISCONNECT);
             if (tcpIn != null) tcpIn.close();
             if (tcpOut != null) tcpOut.close();
             if (tcpSocket != null) tcpSocket.close();

@@ -11,6 +11,7 @@ public class ClientThread implements Runnable {
     private PrintWriter out;
     private BufferedReader in;
     private boolean running = true;
+    private int score = 0;
 
     public ClientThread(Socket socket, int clientId, UDPThread udpThread) {
         this.clientSocket = socket;
@@ -24,15 +25,22 @@ public class ClientThread implements Runnable {
             out = new PrintWriter(clientSocket.getOutputStream(), true);
             in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
 
-            sendMessage("WELCOME|" + clientId);
+            sendMessage(GameProtocol.WELCOME + "|" + clientId);
 
             while (running) {
                 String input = in.readLine();
                 if (input == null) {
                     break;
                 }
-                System.out.println("Client " + clientId + ": " + input);
-                processClientMessage(input);
+
+                if (input.startsWith(GameProtocol.DISCONNECT)) {
+                    running = false;
+                } else if (input.startsWith("ANSWER|")) {
+                    String[] parts = input.split("\\|");
+                    int questionNum = Integer.parseInt(parts[1]);
+                    int answer = Integer.parseInt(parts[2]);
+                    ServerMain.processAnswer(clientId, questionNum, answer);
+                }
             }
         } catch (IOException e) {
             System.err.println("ClientThread " + clientId + " error: " + e.getMessage());
@@ -48,17 +56,19 @@ public class ClientThread implements Runnable {
         }
     }
 
-    private void processClientMessage(String message) {
-        if (message.startsWith("DISCONNECT")) {
-            running = false;
-        }
-    }
-
     public void sendMessage(String message) {
         out.println(message);
     }
 
     public int getClientId() {
         return clientId;
+    }
+
+    public int getScore() {
+        return score;
+    }
+
+    public void updateScore(int delta) {
+        score += delta;
     }
 }
